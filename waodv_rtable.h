@@ -67,16 +67,19 @@ class WAODV_Neighbor {
         friend class WAODV;
         friend class waodv_rt_entry;
  public:
-        WAODV_Neighbor(u_int32_t a) { nb_addr = a;
+        WAODV_Neighbor(u_int32_t a) {
+        nb_addr = a;
         trust_info.trust=1;
         trust_info.d_trust=0.5;
         trust_info.in_trust=0.5;
+        ext =0;
         }
         nsaddr_t getnbaddr();
         struct trust_info trust_info;
         struct qos_info qos_info;
-        int count;
+        float count;
         float time;
+        float ext;
 
  protected:
         LIST_ENTRY(WAODV_Neighbor) nb_link;

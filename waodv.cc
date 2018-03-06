@@ -59,7 +59,10 @@ static int route_request = 0;
 /*
  TCL Hooks
  */
+//全局邻居列表 如果要获取节点x的邻居列表，调用方式为 WAODV_Neighbor *p = nblist[x];
 WAODV_Neighbor * WAODV::nblist[50] = { NULL };
+//全局hello包计数，如果要知道节点x的邻居列表，调用方式为 float p = hellocount[x];
+float WAODV::hellocount[50]={1};
 int hdr_waodv::offset_;
 //下面两个类是tcl脚本接口，不需要改变
 static class WAODVHeaderClass: public PacketHeaderClass {
@@ -171,8 +174,8 @@ void WAODV::tap(const Packet *p) {
 		nsaddr_t next_hop_ = ch->next_hop_;
 		nsaddr_t drc_ = ih->daddr();
 		//混杂监听，更新当前节点的统计信息
-		std::cout<<"tap" <<" node"<<index<<" "<<ch->uid()<<" "<<prev_hop_<<" "<<next_hop_<<" "<<drc_<<" "<<CURRENT_TIME<<std::endl;
-		nr_update(p);
+//		std::cout<<"tap" <<" node"<<index<<" "<<ch->uid()<<" "<<prev_hop_<<" "<<next_hop_<<" "<<drc_<<" "<<CURRENT_TIME<<std::endl;
+//		nr_update(p);
 	}
 }
 
@@ -196,8 +199,6 @@ WAODV::WAODV(nsaddr_t id) :
 	LIST_INIT(&bihead);
 	logtarget = 0;
 	ifqueue = 0;
-	nrlist = NULL;
-	hellocount = 0;
 	minc = 10000000;
 }
 
@@ -748,16 +749,13 @@ void WAODV::recvRequest(Packet *p) {
 	rt0->rt_expire = max(rt0->rt_expire, (CURRENT_TIME + REV_ROUTE_LIFE));
 	//与论文中实现不太一样，缺少信任值
 	//缺少上游节点对自身的信任值
-	WAODV_Neighbor *tmp = nblist[ih->saddr()];
-	while (tmp!=NULL){
-		if (tmp->nb_addr == this->index){
+	WAODV_Neighbor *pretrust = nblist[ih->saddr()];
+	while (pretrust!=NULL){
+		if (pretrust->nb_addr == this->index){
 			break;
 		}
-		tmp=tmp->nb_link.le_next;
+		pretrust=pretrust->nb_link.le_next;
 	}
-
-	rq->ct = rq->ct + this->ext * ((CURRENT_TIME-rq->delay_time)+YIT)*(1-tmp->trust_info.trust);
-	rq->delay_time = CURRENT_TIME;
 
 	if ((rq->rq_src_seqno > rt0->rt_seqno)
 			|| ((rq->rq_src_seqno == rt0->rt_seqno)
@@ -878,6 +876,7 @@ void WAODV::recvRequest(Packet *p) {
 	else {
 		nsaddr_t prehop = ih->saddr();
 		ih->saddr() = index;
+		float ct = rq->ct;
 		WAODV_Neighbor *tmp = nbhead.lh_first;
 		while (tmp != NULL) {
 			if (tmp->trust_info.trust > TRUSTTHRESHOLD && tmp->nb_addr != prehop) {
@@ -895,6 +894,9 @@ void WAODV::recvRequest(Packet *p) {
 				if (rt)
 					rq->rq_dst_seqno = max(rt->rt_seqno, rq->rq_dst_seqno);
 				//forward((waodv_rt_entry*) 0, p, DELAY);
+
+				rq->ct = ct + tmp->ext * ((CURRENT_TIME-rq->delay_time)+YIT)*(1-pretrust->trust_info.trust);
+					rq->delay_time = CURRENT_TIME;
 				Scheduler::instance().schedule(target_, p->copy(),
 						0.01 * Random::uniform());
 				//std::cout<<"f"<< index<<"--->"<<tmp->nb_addr<<std::endl;
@@ -1158,11 +1160,7 @@ void WAODV::sendRequest(nsaddr_t dst) {
 
 	assert(rt);
 
-	/*更多知道相关问题>>更更多知道相关问题>>
-	 * 更多知道相关问题>>
-	 * 多知道相关问题>>
-	 *
-	 *
+	/*更多知道相关问题
 	 *  Rate limit sen更多知道相关问题>>
 	 *  ding of Route Requests. We are very conservative
 	 *  about sending out route requests.
@@ -1399,7 +1397,6 @@ void WAODV::sendHello(int test) {
 	ih->dport() = RT_PORT;
 	ih->ttl_ = 1;
 	rh->nb = nbhead.lh_first;
-	hellocount++;
 	Scheduler::instance().schedule(target_, p, 0.0);
 }
 void WAODV::sendHello() {
@@ -1432,7 +1429,7 @@ void WAODV::sendHello() {
 	ih->dport() = RT_PORT;
 	ih->ttl_ = 1;
 	//统计发出的hello包总数
-	hellocount++;
+	hellocount[index]++;
 	Scheduler::instance().schedule(target_, p, 0.0);
 }
 
@@ -1628,10 +1625,14 @@ void WAODV::nr_trustupdate() {
 	 * 比如节点1的邻居有2,3，则把2,3的邻居们用一个数组统计他们出现的次数，数组的下标是节点的地址。
 	 */
 	while (nb != 0) {
-		//查看有没有该邻居的记录（向该邻居发送过cbr数据包）
+		/**这里需要判断当前节点是否与其邻居节传输过数据包
+		 * 如果没有传过数据包，那么对其邻居节点的直接信任值为0.5
+		 * 如果传过数据包，则使用记录的数据算直接信任
+		 */
 		NR* r = nr_find(nb->nb_addr);
 		if (r != NULL) {
 			nb->trust_info.d_trust = (r->recvfrom / r->forwardto);     //计算直接信任值
+		}
 			WAODV_Neighbor *p = nblist[nb->nb_addr];     //获取邻居节点列表
 			while (p != NULL) {
 				if (nraddr[p->nb_addr] == 0) {
@@ -1646,7 +1647,7 @@ void WAODV::nr_trustupdate() {
 				}
 				p = p->nb_link.le_next;
 			}
-		}
+		//}
 		nb = nb->nb_link.le_next;
 	}
 
@@ -1662,9 +1663,9 @@ void WAODV::nr_trustupdate() {
 		}
 		trust_t = W1 * d_trust + W2 * in_trust;
 		nb->trust_info.trust = U * trust + (1 - U) * trust_t;
-		std::cout << "t " << index << "-->" << nb->nb_addr << " " << d_trust
-				<< " " << in_trust << " " << nb->trust_info.trust << " "
-				<< trust_t << std::endl;
+//		std::cout << "t " << index << "-->" << nb->nb_addr << " " << d_trust
+//				<< " " << in_trust << " " << nb->trust_info.trust << " "
+//				<< trust_t <<" "<< CURRENT_TIME<<std::endl;
 		nb = nb->nb_link.le_next;
 	}
 	//释放统计表内存
@@ -1676,26 +1677,34 @@ void WAODV::nr_trustupdate() {
 
 void WAODV::hcount() {
 	WAODV_Neighbor *nb = nbhead.lh_first;
-	float count = 0;     //当前节点收到邻居节点们的hello包总数
-	float count2 = 0;     //邻居节点收到当前节点发送的hello包
-	int n = 1;
+	float forward = 1.;     //前向比
+	float backward = 1.;     //后向比
 	while (nb != NULL) {
-		count += nb->count;
-		nb->count = 0;
+		//当前节点收到邻居节点的包的数目/邻居发送的总数目
+		/*这里出现一种情况是,backward的值大于1，出现这种情况的原因是
+		 * 邻居节点和当前节点的hello包的更新不同步导致
+		 *
+		 */
+		backward = nb->count/hellocount[nb->nb_addr];
+
+		//查找邻居列表
 		WAODV_Neighbor *tmp = nblist[nb->nb_addr];
-		while (tmp != NULL) {
+		while (tmp != 0) {
 			if (tmp->nb_addr == index)
 				break;
 			tmp = tmp->nb_link.le_next;
 		}
-		if (tmp != NULL) {
-			count2 += tmp->count;
+		if (tmp != 0) {
+			//邻居节点收到的当前节点发送的数目/当前节点发送的总数目
+			forward = tmp->count/hellocount[index];
 		}
+		nb->ext = 1/(backward * forward);
+		//收到的邻居节点的数目包数目清零
+		nb->count=1;
 		nb = nb->nb_link.le_next;
-		n++;
+
 	}
-	ext = (hellocount * n * n * hellocount) / (count * count2 + 1);
 	//重新计数
-	hellocount = 1;
+	hellocount[index] = 1;
 }
 

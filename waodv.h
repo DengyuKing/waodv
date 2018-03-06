@@ -342,9 +342,8 @@ class WAODV: public Tap, public Agent {
         LocalRepairTimerw lrtimer;
         UpdateTrust		trustimer;
         HelloCount		hc;
-        float			ext;
         float			minc;
-        float hellocount;
+        static float hellocount[50];
         static WAODV_Neighbor * nblist[50];
 
 
@@ -353,7 +352,6 @@ class WAODV: public Tap, public Agent {
          */
         waodv_rtable          rtable;
         //邻居节点信任值，用于发送
-        nr_trust *nrlist;
 
 
         /*
