@@ -323,7 +323,7 @@ class WAODV: public Tap, public Agent {
 	
 	double 		PerHopTime(waodv_rt_entry *rt);
 
-
+		bool			malicious;				//是否为恶意节点
         nsaddr_t        index;                  // IP Address of this node
         u_int32_t       seqno;                  // Sequence Number
         int             bid;                    // Broadcast ID

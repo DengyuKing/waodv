@@ -94,6 +94,12 @@ int WAODV::command(int argc, const char* const * argv) {
 			return TCL_OK;
 		}
 
+		//是否设置成恶意节点
+		if (strcmp(argv[1],"hacker") == 0) {
+					malicious = true;
+					return TCL_OK;
+				}
+
 		if (strncasecmp(argv[1], "start", 2) == 0) {
 			btimer.handle((Event*) 0);
 
@@ -200,6 +206,7 @@ WAODV::WAODV(nsaddr_t id) :
 	logtarget = 0;
 	ifqueue = 0;
 	minc = 10000000;
+	malicious = false;
 }
 
 /*
@@ -507,7 +514,18 @@ void WAODV::rt_resolve(Packet *p) {
 	if (rt->rt_flags == RTF_UP) {
 		assert(rt->rt_hops != INFINITY2);
 		//ch->prev_hop_=this->index;
-		forward(rt, p, NO_DELAY);
+		//如果是恶意节点选择性丢弃,概率为50%
+		if (malicious == true){
+			int randNum = rand()%100;
+			if(randNum>=49){
+				forward(rt, p, NO_DELAY);
+			}else{
+				drop(p,DROP_RTR_ROUTE_LOOP);
+			}
+
+		}else{
+			forward(rt, p, NO_DELAY);
+		}
 	}
 	/*
 	 *  if I am the source of the packet, then do a Route Request.
