@@ -86,7 +86,7 @@ struct hdr_waodv_request {
         float		    ct;
         float 			trust;
         float			delay_time;
-        struct list		*head;
+        float			pre_trust;
 
 
   // This define turns on gratuitous replies- see aodv.cc for implementation contributed by

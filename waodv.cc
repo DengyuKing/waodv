@@ -47,7 +47,7 @@
 #define W2	0.4
 #define U	0.5
 #define TRUSTUPDATEINTERVAL 	0.05
-#define TRUSTTHRESHOLD	0
+#define TRUSTTHRESHOLD	0.6
 #define YIT	0.05
 
 #ifdef DEBUG
@@ -765,15 +765,7 @@ void WAODV::recvRequest(Packet *p) {
 	}
 
 	rt0->rt_expire = max(rt0->rt_expire, (CURRENT_TIME + REV_ROUTE_LIFE));
-	//与论文中实现不太一样，缺少信任值
-	//缺少上游节点对自身的信任值
-	WAODV_Neighbor *pretrust = nblist[ih->saddr()];
-	while (pretrust!=NULL){
-		if (pretrust->nb_addr == this->index){
-			break;
-		}
-		pretrust=pretrust->nb_link.le_next;
-	}
+
 
 	if ((rq->rq_src_seqno > rt0->rt_seqno)
 			|| ((rq->rq_src_seqno == rt0->rt_seqno)
@@ -913,7 +905,8 @@ void WAODV::recvRequest(Packet *p) {
 					rq->rq_dst_seqno = max(rt->rt_seqno, rq->rq_dst_seqno);
 				//forward((waodv_rt_entry*) 0, p, DELAY);
 
-				rq->ct = ct + tmp->ext * ((CURRENT_TIME-rq->delay_time)+YIT)*(1-pretrust->trust_info.trust);
+				rq->ct = ct + tmp->ext * ((CURRENT_TIME-rq->delay_time)+YIT)*(1-rq->pre_trust);
+				rq->pre_trust = tmp->trust_info.trust;
 					rq->delay_time = CURRENT_TIME;
 				Scheduler::instance().schedule(target_, p->copy(),
 						0.01 * Random::uniform());
@@ -1285,7 +1278,6 @@ void WAODV::sendRequest(nsaddr_t dst) {
 	rq->rq_src_seqno = seqno;
 	rq->rq_timestamp = CURRENT_TIME;
 	rq->ct = 0;
-	rq->head = NULL;
 	rq->delay_time = CURRENT_TIME;
 	WAODV_Neighbor *tmp = nbhead.lh_first;
 	while (tmp != NULL) {
@@ -1296,6 +1288,7 @@ void WAODV::sendRequest(nsaddr_t dst) {
 			 l->addr=index;
 			 l->next=rq->head;
 			 rq->head=l;*/
+			rq->pre_trust = tmp->trust_info.trust;
 			Scheduler::instance().schedule(target_, p->copy(), 0.);
 			//  std::<<"s"<<index<<"--->"<<tmp->nb_addr<<std::endl;
 		}
