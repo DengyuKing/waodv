@@ -217,10 +217,11 @@ void UpdateTrust::expire(Event *e) {
 	agent->nr_trustupdate();
 	agent->trustimer.resched((double) TRUSTUPDATEINTERVAL);
 }
+//不需要统计qos
 void HelloCount::expire(Event *e) {
 	//统计hello包用于QoS计算
-	agent->hcount();
-	agent->hc.resched((double) 1);
+	//agent->hcount();
+	//agent->hc.resched((double) 1);
 }
 void BroadcastTimerw::handle(Event*) {
 	agent->id_purge();			//删除节点
@@ -735,15 +736,15 @@ void WAODV::recvRequest(Packet *p) {
 		return;
 	}
 
-	if (rq->rq_dst != index && id_lookup(rq->rq_src, rq->rq_bcast_id)) {
-
-#ifdef DEBUG
-		fprintf(stderr, "%s: discarding request\n", __FUNCTION__);
-#endif // DEBUG
-
-		Packet::free(p);
-		return;
-	}
+//	if (rq->rq_dst != index && id_lookup(rq->rq_src, rq->rq_bcast_id)) {
+//
+//#ifdef DEBUG
+//		fprintf(stderr, "%s: discarding request\n", __FUNCTION__);
+//#endif // DEBUG
+//
+//		Packet::free(p);
+//		return;
+//	}
 
 	/*
 	 * Cache the broadcast ID
@@ -772,17 +773,17 @@ void WAODV::recvRequest(Packet *p) {
 					&& (rq->rq_hop_count < rt0->rt_hops))) {
 		// If we have a fresher seq no. or lesser #hops for the
 		// same seq no., update the rt entry. Else don't bother.
-		if (index == rq->rq_dst && rq->ct < rt0->ct) {
-			/*struct list * p =rq->head;
-			 while (p!=NULL){
-			 std::cout <<p->addr<<" ";
-			 p=p->next;
-			 }
-			 std::cout<<std::endl;*/
-			rt_update(rt0, rq->rq_src_seqno, rq->rq_hop_count, ih->saddr(),
-					max(rt0->rt_expire, (CURRENT_TIME + REV_ROUTE_LIFE)),
-					rq->ct);
-		} else
+//		if (index == rq->rq_dst && rq->ct < rt0->ct) {
+//			/*struct list * p =rq->head;
+//			 while (p!=NULL){
+//			 std::cout <<p->addr<<" ";
+//			 p=p->next;
+//			 }
+//			 std::cout<<std::endl;*/
+//			rt_update(rt0, rq->rq_src_seqno, rq->rq_hop_count, ih->saddr(),
+//					max(rt0->rt_expire, (CURRENT_TIME + REV_ROUTE_LIFE)),
+//					rq->ct);
+//		} else
 			rt_update(rt0, rq->rq_src_seqno, rq->rq_hop_count, ih->saddr(),
 					max(rt0->rt_expire, (CURRENT_TIME + REV_ROUTE_LIFE)));
 		if (rt0->rt_req_timeout > 0.0) {
@@ -905,7 +906,7 @@ void WAODV::recvRequest(Packet *p) {
 					rq->rq_dst_seqno = max(rt->rt_seqno, rq->rq_dst_seqno);
 				//forward((waodv_rt_entry*) 0, p, DELAY);
 
-				rq->ct = ct + tmp->ext * ((CURRENT_TIME-rq->delay_time)+YIT)*(1-rq->pre_trust);
+				//rq->ct = ct + tmp->ext * ((CURRENT_TIME-rq->delay_time)+YIT)*(1-rq->pre_trust);
 				rq->pre_trust = tmp->trust_info.trust;
 					rq->delay_time = CURRENT_TIME;
 				Scheduler::instance().schedule(target_, p->copy(),
