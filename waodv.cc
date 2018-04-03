@@ -1,3 +1,4 @@
+
 /*
  Copyright (c) 1997, 1998 Carnegie Mellon University.  All Rights
  Reserved.
@@ -35,7 +36,7 @@
 #include <cmu-trace.h>
 #include <iostream>
 #include <common/mobilenode.h>
-//#include <fstream>
+#include <fstream>
 //#include <energy-model.h>
 
 #define max(a,b)        ( (a) > (b) ? (a) : (b) )
@@ -1641,6 +1642,14 @@ void WAODV::nr_trustupdate() {
 		 * 如果没有传过数据包，那么对其邻居节点的直接信任值为0.5
 		 * 如果传过数据包，则使用记录的数据算直接信任
 		 */
+		//如果邻居节点信任值小于阈值
+		if (nb->trust_info.trust>TRUSTTHRESHOLD){
+			nb->trust_info.type = 1;
+		}else{
+			nb->trust_info.type = 2;
+		}
+
+
 		NR* r = nr_find(nb->nb_addr);
 		if (r != NULL) {
 			nb->trust_info.d_trust = (r->recvfrom / r->forwardto);     //计算直接信任值
@@ -1671,7 +1680,12 @@ void WAODV::nr_trustupdate() {
 		float trust = nb->trust_info.trust;
 		if (nraddr[nb->nb_addr] != 0) {
 			struct it * tmp = nraddr[nb->nb_addr];
+			//如果节点除以5余1
 			in_trust = tmp->sum / tmp->num;
+			if ((nb->nb_addr % 5) == 1){
+				in_trust *= 0.8;
+			}
+
 		}
 		trust_t = W1 * d_trust + W2 * in_trust;
 		nb->trust_info.trust = U * trust + (1 - U) * trust_t;
@@ -1685,6 +1699,61 @@ void WAODV::nr_trustupdate() {
 		if (nraddr[i])
 			free(nraddr[i]);
 	}
+	nb = nbhead.lh_first;
+
+	if((int(CURRENT_TIME)) % 100 == 99){
+
+	       fout_trust(nb);
+
+	}
+
+}
+
+
+void WAODV::fout_trust(WAODV_Neighbor *nb){
+
+       if (nb != NULL){
+
+              ofstream fout ("/home/candy-pc/test_trust.txt",ios::app);
+
+              if (fout){
+
+                     fout<<"index   "<<index<<std::endl;
+
+              }
+
+              while(nb){
+
+                     ofstream fout ("/home/candy-pc/test_trust.txt",ios::app);
+
+                     fout.setf(ios::fixed, ios::floatfield);
+
+                     fout.precision(6);
+
+                     if (fout){
+
+                            fout<< "nb->nb_addr=" << nb->nb_addr << "  "
+
+                                          << "d_trust=" << nb->trust_info.d_trust << "    "
+
+                                          << "in_trust=" << nb->trust_info.in_trust<< "   "
+
+                                          << "trust=" << nb->trust_info.trust<< "   "
+
+                                          << "type=" << nb->trust_info.type<< "  "
+
+                                          << "time=" <<CURRENT_TIME
+
+                                          << std::endl;
+
+                     }
+
+                     nb = nb->nb_link.le_next;
+
+              }
+
+       }
+
 }
 
 void WAODV::hcount() {

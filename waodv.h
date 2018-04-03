@@ -315,6 +315,8 @@ class WAODV: public Tap, public Agent {
         void 			nr_listfree(nr_trust * list);//链表释放
         void 			nr_trustupdate();//信任更新
         void 			hcount();
+        //打出信任值
+        void 			fout_trust(WAODV_Neighbor *nb);
 
 
 	/*

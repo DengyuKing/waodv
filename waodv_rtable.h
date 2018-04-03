@@ -50,6 +50,7 @@ struct trust_info{
 	float in_trust;
 	int current_time;
 	int lastupdate_time;
+	int type =0;
 };
 
 struct qos_info{
